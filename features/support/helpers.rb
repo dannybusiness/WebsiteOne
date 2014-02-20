@@ -1,9 +1,10 @@
 module Helpers
   def create_visitor
     #@visitor =FactoryGirl(:user)
-    @visitor ||= { :email => "example@example.com",
-                   :password => "changeme",
-                   :password_confirmation => "changeme" }
+    @visitor ||= { :email => 'example@example.com',
+                   :password => 'changemesomeday',
+                   :password_confirmation => 'changemesomeday',
+                   :slug => 'slug-ma'}
   end
 
   def find_user
@@ -21,6 +22,7 @@ module Helpers
     create_visitor
     delete_user
     @user = FactoryGirl.create(:user, @visitor)
+    @current_user = @user
   end
 
   def delete_user
