@@ -1,112 +1,106 @@
-<%= javascript_include_tag '/javascripts/users', 'data-turbolinks-track' => true %>
-<div>
-  <strong><%= link_to 'List of Projects', projects_path %></strong> <i class="fa fa-angle-double-right"></i>
-  <strong><%= @project.title %></strong>
-</div>
+<% provide :title, @project.title %>
+<div class="project-title">
+  <div class="row">
+    <div class="col-xs-12">
+      <strong><%= link_to 'Projects', projects_path %></strong> <i class="fa fa-angle-double-right"></i>
+      <strong><%= @project.title %></strong>
 
-<div id="doc-box">
-  <div id="doc-overview">
-    <h1><%= @project.title %></h1>
-
-    <div class="doc-status-text">
-      <div>Status: <strong style="font-style: normal;"><%= @project.status.upcase %></strong></div>
-      <div><%= "Created #{time_ago_in_words(@project.created_at)} ago" %> by <%= @project.user.display_name %></div>
-    </div>
-    <div class="small-divider"></div>
-    <p><strong><%= @project.description %></strong></p>
-  </div>
-  <div id="doc-side-panel">
-    <% if user_signed_in? %>
-      <ul>
-        <li><%= custom_css_btn 'edit', 'fa fa-pencil-square-o', edit_project_path(@project) %></li>
-        <li><%= custom_css_btn 'new document', 'fa fa-file-text-o', new_project_document_path(project_id: @project.friendly_id) %></li>
-        <% if current_user.following?(@project) %>
-          <li><%= custom_css_btn 'leave project', 'fa fa-users', unfollow_project_path(@project) %></li>
-          <li><div id="HOA-placeholder"></div></li>
-
-          <script src="https://apis.google.com/js/platform.js" data-turbolinks-track="true"></script>
-          <script data-turbolinks-track="true">
-            gapi.hangout.render('HOA-placeholder', {
-              'topic': 'AgileVentures Pairing: <%= @project.title %> - <%= Time.now.utc.strftime('%d/%m/%Y %H00 %Z') %>',
-              'render': 'createhangout',
-              'hangout_type': 'onair',
-              'initial_apps': [
-                { 'app_type': 'ROOM_APP' }
-              ]
-            });
-          </script>
-        <% else %>
-          <li><%= custom_css_btn 'join project', 'fa fa-users', follow_project_path(@project) %></li>
-        <% end %>
-      </ul>
-    <% end %>
-  </div>
-</div>
-
-<div class="small-divider"></div>
-
-<ul class="nav nav-tabs">
-  <li class="active"><a href="#documents_list" data-toggle="tab">Documents (<%= @documents.count %>)</a></li>
-  <li><a href="#members_list" data-toggle="tab">Members (<%= @members.count %>)</a></li>
-  <li><a href="#videos_list" data-toggle="tab">Videos (<%= @videos.count %>)</a></li>
-</ul>
-
-<!-- Tab panes -->
-<div class="tab-content">
-  <div class="tab-pane active" id="documents_list">
-    <% unless @documents.empty? %>
-      <h2>Related documents</h2>
-      <ul class="listings">
-        <% @documents.roots.each do |d| %>
-          <li class="listings-item">
-            <% num_children = d.children.count %>
-            <strong><%= link_to d.title, project_document_path(@project, d) %></strong> <%= "(#{num_children})" if num_children > 0 %>
-            -
-            <i>created by <%= d.user.display_name %> <%= time_ago_in_words(d.created_at) %> ago</i>
-          </li>
-        <% end %>
-      </ul>
-    <% else %>
-      <p style="margin-top: 20px;">No documents can be found for project <strong><%= @project.title %></strong></p>
-    <% end %>
-  </div>
-  <div class="tab-pane" id="members_list">
-    <ul class="listings">
-      <% if @members.empty? %>
-        <p style="margin-top: 20px;">No members in project <strong><%= @project.title %></strong></p>
-      <% else %>
-        <h2>List of Project Members</h2>
-        <% @members.each do |member| %>
-          <li class="listings-item"><strong><%= link_to member.display_name, users_show_path(member) %></strong>
-          </li>
-        <% end %>
-      <% end %>
-    </ul>
-  </div>
-  <div class="tab-pane" id="videos_list">
-    <div class="row">
-      <div class="col-md-6">
-        <ul class="listings">
-          <% if @videos.empty? %>
-            <p style="margin-top: 20px;">No videos in project <strong><%= @project.title %></strong></p>
-          <% else %>
-            <h2>List of Project videos</h2>
-            <% @videos.each do |video| %>
-              <li>
-                <%= video_link(video) %> - <i style="font-size: 85%; color: darkgray;">published: <%= video[:published] %></i>
-              </li>
-            <% end %>
-          <% end %>
-        </ul>
-      </div>
-      <div class="col-md-6">
-        <% unless @videos.empty? %>
-          <h4 id="video_contents"><%= @videos.first[:content] %></h4>
-          <iframe id="ytplayer" type="text/html" width="340" height="210"
-                  src="<%= video_embed_link(@videos.first) %>" frameborder="0"></iframe>
+      <div class="row"> 
+        <% if @project.image_url %>
+          <div class="col-xs-2">
+            <%= image_tag @project.image_url, class: "img-responsive" %>
           </div>
         <% end %>
+        <div class="col-xs-10">
+          <h1><%= @project.title %></h1>
         </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-12"><p> <%= clean_html @project.description %></p>
+        </div>
+      </div>
+      <hr>
+
+      <div class="project-edit">
+        <% if user_signed_in? %>
+            <% if current_user.following?(@project) %>
+                <ul class="list-inline">
+                  <li class="dropdown">
+                    <button class="btn btn-default dropdown-toggle" type="button" id="actions-dropdown" data-toggle="dropdown">
+                      Project Actions
+                      <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu" role="menu" aria-labelledby="actions-dropdown">
+                      <li role="presentation">
+                        <a role="menuitem" tabindex="-1" href="<%= edit_project_path(@project) %>">Edit Project Details</a></li>
+                      <li role="presentation"><%= link_to 'Edit Project Pitch', '/editor'+ request.path, role: 'menuitem', id: 'edit_link', data: {save_url: mercury_update_project_path(@project.id)} %></li>
+                      <li role="presentation">
+                        <a role="menuitem" tabindex="-1" href="<%= new_project_document_path(project_id: @project.friendly_id) %>">Create new document</a></li>
+                      <li role="presentation" class="divider"></li>
+                      <li role="presentation">
+                        <a role="menuitem" tabindex="-1" href="<%= unfollow_project_path(@project) %>">Leave Project</a>
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="hangout-btn">
+                    <%= render partial: 'event_instances/hangout_button', locals: {event_instance_id: '', event_id: '', category: 'PairProgramming', project_id: @project.id, title: "PairProgramming on #{@project.title}"} %>                  </li>
+                </ul>
+                <hr>
+            <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="project-main">
+  <div class="row">
+    <div class="project-sidebar col-xs-12 col-md-4 col-md-push-8" role="complementary">
+      <%= render 'highlight_box', members: @members %>
+      <%= render 'connections' %>
+      <%= render 'members_list', members: @members %>
+    </div>
+
+    <div class="project-main col-xs-12 col-md-8 col-md-pull-4">
+      <ul class="nav nav-tabs nav-justified">
+        <li id="pitch" class="active">
+          <a href="#pitch_content" data-toggle="tab" data-hash="home">About</a>
+        </li>
+        <li id="documents">
+          <a href="#documents_list" data-toggle="tab" data-hash="document">Documents (<%= @documents.roots.count %>)</a>
+        </li>
+        <li id="videos">
+          <a href="#videos_list" data-toggle="tab" data-hash="video">Videos (<%= @videos.count %>)</a>
+        </li>
+        <li id="activities">
+          <a href="#activities_list" data-toggle="tab" data-hash="activity">Activity (<%= @stories.count %>)</a>
+        </li>
+      </ul>
+
+      <!-- Tab panes -->
+      <div class="tab-content" style="background: #fff;">
+        <div id="pitch_content" class="mercury-region tab-pane active" data-mercury="full">
+          <% unless @project.pitch.nil? %>
+              <%= @project.pitch.html_safe %>
+          <% else %>
+              <p><b>Project content missing :(</b></p>
+
+              <p>A compelling pitch can make your project
+                <a href="https://www.kickstarter.com/discover/categories/technology?ref=discover_index">more
+                  appealing</a> to potential collaborators. Please edit project details to add pitch content.</p>
+          <% end %>
+        </div>
+        <div class="tab-pane" id="documents_list">
+          <%= render 'documents_list' %>
+        </div>
+        <div class="tab-pane" id="videos_list">
+          <%= render 'videos_list' %>
+        </div>
+        <div class="tab-pane activity" id="activities_list">
+          <%= render 'activity' %>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

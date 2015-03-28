@@ -28,12 +28,14 @@ module HtmlSelectorsHelpers
       # web steps:
       when "Account details"
         'form#edit_user'
-      when "Contact form"
-        'form#contact_form'
       when 'video description'
         '#video_contents'
       when 'player'
         '#ytplayer'
+      when 'Modal window'
+        '.modal-body'
+      when 'The Breadcrumb'
+        '#not-sidebar-content'
       when /^"(.+)"$/
         $1
 

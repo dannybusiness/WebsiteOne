@@ -1,29 +1,24 @@
 class RegistrationsController < Devise::RegistrationsController
+  layout 'layouts/user_profile_layout', only: [:edit]
   def create
     super
-    session[:omniauth] = nil unless @user.new_record?
+    unless @user.new_record?
+      session[:omniauth] = nil
+      Mailer.send_welcome_message(@user).deliver if Features.enabled?(:welcome_email)
+    end
   end
 
   def update
-    # raise 'sf'
     if params[:preview]
-      params[:user][:display_email] == '1' ? display_email = true : display_email = false
-      resource.display_email = display_email
+      resource.display_email = params[:user][:display_email] == '1'
       render :action => 'edit'
     else
+      @user = User.friendly.find(current_user.friendly_id)
+      @user.skill_list = params[:user].delete "skill_list" # Extracts skills from params
       account_update_params = devise_parameter_sanitizer.sanitize(:account_update)
 
-      if account_update_params[:password].blank?
-        account_update_params.delete('password')
-        account_update_params.delete('password_confirmation')
-      end
-
-      # Bryan: creates a new but identical object
-      @user = User.friendly.find(current_user.friendly_id)
       if @user.update_attributes(account_update_params)
         set_flash_message :notice, :updated
-        # Sign in the user bypassing validation in case his password changed
-        sign_in current_user, :bypass => true
         redirect_to after_update_path_for(@user)
       else
         render :edit
@@ -31,18 +26,17 @@ class RegistrationsController < Devise::RegistrationsController
     end
   end
 
-  def preview
-    @user = current_user
-  end
-
-
   private
 
-  def build_resource(*args)
-    super
+  def build_resource(hash=nil)
+    self.resource = User.new_with_session(hash || {}, session)
     if session[:omniauth]
       @user.apply_omniauth(session[:omniauth])
       @user.valid?
     end
+  end
+
+  def after_update_path_for(resource)
+    user_path(resource)
   end
 end

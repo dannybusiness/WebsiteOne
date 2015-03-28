@@ -1,4 +1,3 @@
-@focus
 Feature: Sidebar navigation
   As a user
   So that I may navigate through project documents with ease
@@ -16,6 +15,8 @@ Feature: Sidebar navigation
       | Documentation | My documentation |          1 |
       | Another doc   | My content       |          2 |
       | Howto 2       | My documentation |          2 |
+    And there are no videos
+
 
   Scenario: Sidebar is always visible
     Given I am logged in

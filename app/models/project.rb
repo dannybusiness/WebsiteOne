@@ -3,18 +3,58 @@ class Project < ActiveRecord::Base
   friendly_id :title, use: :slugged
 
   validates :title, :description, :status, presence: true
-  acts_as_followable
-  belongs_to :user
-  has_many :documents
+  validates_with PivotalTrackerUrlValidator
+  validates :github_url, uri: true, :allow_blank => true
+  validates_with ImageUrlValidator
+  validates :image_url, uri: true, :allow_blank => true
 
+  belongs_to :user
+  include UserNullable
+  include PublicActivity::Common
+  has_many :documents
+  has_many :event_instances
+  has_many :commit_counts
+
+  acts_as_followable
   acts_as_taggable # Alias for acts_as_taggable_on :tags
 
+  scope :with_github_url, -> { where.not(github_url: '') }
 
   def self.search(search, page)
-    order('LOWER(title)').where('title LIKE ?', "%#{search}%").paginate(per_page: 5, page: page)
+    order('LOWER(title)')
+      .where('title LIKE ?', "%#{search}%")
+      .paginate(per_page: 5, page: page)
   end
 
+  def youtube_tags
+    tag_list
+      .clone
+      .push(title)
+      .map(&:downcase)
+      .uniq
+  end
 
+  def members
+    followers.select(&:display_profile)
+  end
+
+  def members_tags
+    members.map(&:youtube_user_name)
+      .compact
+      .map(&:downcase)
+      .uniq
+  end
+
+  def github_repo
+    /github.com\/(.+)/.match(github_url)[1] if github_url
+  end
+
+  def contribution_url
+    "https://github.com/#{github_repo}/graphs/contributors"
+  end
+
+  # Bryan: Used to generate paths, used only in testing.
+  # Might want to switch to rake generated paths in the future
   def url_for_me(action)
     if action == 'show'
       "/projects/#{to_param}"

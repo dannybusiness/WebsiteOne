@@ -1,4 +1,3 @@
-@focus
 Feature: Manage Document
   As a project member
   So that I can share my work related to a project
@@ -15,6 +14,11 @@ Feature: Manage Document
       | Guides        | My guide to      | hello mars  |
       | Documentation | My documentation | hello world |
 
+    And the following revisions exist
+      | title         | revisions  |
+      | Guides        | 1          |
+      | Documentation | 3          |
+    And there are no videos
 
   Scenario: Render of list documents
     Given I am on the "Show" page for project "hello world"
@@ -26,7 +30,8 @@ Feature: Manage Document
   Scenario: Create a new document
     Given I am logged in
     Given I am on the "Show" page for project "hello world"
-    When I click the very stylish "New Document" button
+    When I click the "Join Project" button
+    And I click the "Create new document" button
     And I fill in "Title" with "New doc title"
     And I click "Submit"
     Then I should see "Document was successfully created."
@@ -34,16 +39,18 @@ Feature: Manage Document
   Scenario: Create a new document page should have a back button
     Given I am logged in
     Given I am on the "Show" page for project "hello world"
-    When I click the very stylish "New Document" button
+    When I click the "Join Project" button
+    And I click the "Create new document" button
     And I click "Back"
     Then I should be on the "Show" page for project "hello world"
 
   Scenario: Show a document
     Given I am on the "Show" page for project "hello mars"
+  #???
     When I click the sidebar link "Guides"
     Then I should be on the "Show" page for document "Guides"
     And I should see "Guides"
-    And I should see "My guide to"
+    And I should see "New content 0"
     And I should see a link to "Edit" page for document "Guides"
 
 
@@ -55,15 +62,15 @@ Feature: Manage Document
     Then I should be on the "Show" page for document "Howto"
     And I should see "Guides"
 
+#NOTE: below scenario is for children's documents of documents, not projects'
 
-
-#Scenario: Destroy a document
-#  Given I am logged in
-#  Given I am on the "Show" page for project "hello world"
-## And I am on the "Documents" page for project "hello world"
-#  When I click the "Destroy" button for document "Howto"
-#  Then I should be on the "Documents" page for project "hello world"
-#  And I should see "Document was successfully deleted."
+  Scenario: Documents children should be sorted by create date (newest first)
+    Given the document "Guides" has a sub-document with title "SubDoc1" created 3 days ago
+    Given the document "Guides" has a sub-document with title "SubDoc2" created 10 days ago
+    Given I am on the "Show" page for document "Guides"
+    Then I should see the sub-documents in this order:
+      | SubDoc1 |
+      | SubDoc2 |
 
   Scenario: Has a link to edit a document using the Mercury Editor
     Given the document "Guides" has a child document with title "Howto"
@@ -73,19 +80,16 @@ Feature: Manage Document
     Then I should be in the Mercury Editor
 
   @javascript
-  Scenario: Mercury editor shows Save and Cancel buttons, hides New Document button,
-    Save button works
-
+  Scenario: Mercury editor shows Save and Cancel buttons, hides New Document button, Save button works
     Given the document "Guides" has a child document with title "Howto"
-    Given I am going to use the Mercury Editor
     And I am logged in
     And I am using the Mercury Editor to edit document "Howto"
     Then I should see button "Save" in Mercury Editor
     And I should see button "Cancel" in Mercury Editor
     And I should not see button "New document" in Mercury Editor
 
-    When I fill in the editable field "Title" with "My new title"
-    And I fill in the editable field "Body" with "This is my new body text"
+    When I fill in the editable field "Title" for "document" with "My new title"
+    And I fill in the editable field "Body" for "document" with "This is my new body text"
     And I click "Save" in Mercury Editor
     Then I should see "The document has been successfully updated."
     And I should be on the "Show" page for document "My new title"
@@ -95,13 +99,11 @@ Feature: Manage Document
   Scenario: Mercury editor Cancel button works
 
     Given the document "Guides" has a child document with title "Howto"
-    Given I am going to use the Mercury Editor
     And I am logged in
     And I am using the Mercury Editor to edit document "Howto"
-
-    When I fill in the editable field "Title" with "My new title"
+    When I fill in the editable field "Title" for "document" with "My new title"
     And I click "Cancel" in Mercury Editor
-    And I should be on the "Show" page for document "Howto"
+    Then I should be on the "Show" page for document "Howto"
     And I should see "Howto"
 
   Scenario: The Mercury Editor cannot be accessed by non-logged in users
@@ -109,29 +111,6 @@ Feature: Manage Document
     Then I should not see "Edit"
     And I try to use the Mercury Editor to edit document "Documentation"
     Then I should see "You do not have the right privileges to complete action."
-
-#Scenario: The Mercury Editor can be accessed from the document index page
-#  Given I am logged in
-#  Given I am on the "Show" page for project "hello world"
-##  And I am on the "Documents" page for project "hello world"
-#  When I click the "Edit" button for document "Howto"
-#  Then I should be in the Mercury Editor
-
-  Scenario: Pressing the Back button will
-
-  @javascript
-  Scenario: The Mercury Editor save button works
-    Given the document "Guides" has a child document with title "Howto"
-    Given I am going to use the Mercury Editor
-    And I am logged in
-    And I am using the Mercury Editor to edit document "Howto"
-    When I fill in the editable field "Title" with "My new title"
-    And I fill in the editable field "Body" with "This is my new body text"
-    And I click "Save" within Mercury Editor toolbar
-    Then I should see "The document has been successfully updated."
-    And I should be on the "Show" page for document "My new title"
-    And I should see "This is my new body text"
-#  Then I no longer need the Mercury Editor
 
   Scenario: The Mercury Editor should only work for the documents
     Given I am logged in
@@ -141,6 +120,75 @@ Feature: Manage Document
     Given I am on the "Projects" page
     When I try to edit the page
     Then I should see "You do not have the right privileges to complete action."
-    Given I am on the "Show" page for project "hello world"
-    When I try to edit the page
-    Then I should see "You do not have the right privileges to complete action."
+
+  @javascript
+  Scenario: Document should have a history of changes 
+    Given I am on the "Show" page for document "Documentation"
+    Then I should see "Revisions"
+    And I should not see any revisions
+    When I click "Revisions"
+    And I should see 4 revisions for "Guides"
+
+  @javascript
+  Scenario: A user can insert an image
+    Given the document "Guides" has a child document with title "Howto"
+    And I am logged in
+    And I am using the Mercury Editor to edit document "Howto"
+    And I am focused on the "document body" within the Mercury Editor
+    When I click on the "Insert Media" button within the Mercury Toolbar
+    Then the Mercury Editor modal window should be visible
+    When I fill in "URL" with "/assets/av-logo-inverse.png" within the Mercury Modal
+    And I click "Insert Media" within the Mercury Editor Modal
+    Then I should see an image with source "/assets/av-logo-inverse.png" within the Mercury Editor
+    Then the Mercury Editor modal window should not be visible
+
+  @javascript
+  Scenario: Missing Image gets added when a user can inserts an invalid image
+    Given the document "Guides" has a child document with title "Howto"
+    And I am logged in
+    And I am using the Mercury Editor to edit document "Howto"
+    And I am focused on the "document body" within the Mercury Editor
+    When I click on the "Insert Media" button within the Mercury Toolbar
+    Then the Mercury Editor modal window should be visible
+    When I fill in "URL" with "https://google.com/sodfjslkdfj.png" within the Mercury Modal
+    And I click "Insert Media" within the Mercury Editor Modal
+    Then I should see an image with source "/assets/mercury/missing-image.png" within the Mercury Editor
+    Then the Mercury Editor modal window should not be visible
+
+  @javascript
+  Scenario: Insert media model accepts full url youtube links
+    Given I am logged in
+    And I am using the Mercury Editor to edit document "Guides"
+    And I am focused on the "document body" within the Mercury Editor
+    And I click on the "Insert Media" button within the Mercury Toolbar
+    And I fill in "YouTube URL" with "https://www.youtube.com/watch?v=foo" within the Mercury Editor Modal
+    And I click "Insert Media" within the Mercury Editor Modal
+    Then the Mercury Editor modal window should not be visible
+    And I should see an video with source "http://www.youtube.com/embed/foo?wmode=transparent" within the Mercury Editor
+
+  @javascript
+  Scenario: Insert media model rejects badly formatted youtube links
+    Given I am logged in
+    And I am using the Mercury Editor to edit document "Guides"
+    And I am focused on the "document body" within the Mercury Editor
+    And I click on the "Insert Media" button within the Mercury Toolbar
+    And I fill in "YouTube URL" with "https://www.youtube.io/watch?v=foo" within the Mercury Editor Modal
+    And I click "Insert Media" within the Mercury Editor Modal
+    Then I should see "is invalid" within the Mercury Modal
+    And the Mercury Editor modal window should be visible
+
+  @javascript
+  Scenario: A logged in user could change a document's parent section
+   Given I am logged in
+   And the following documents exist:
+      | title         | body             | project     |
+      | Decisions     | Examplehere      | hello mars  |
+   And the document "Guides" has a child document with title "Howto"
+   And the document "Guides" has a child document with title "PullRequest"
+   And I am on the "Show" page for document "Howto"
+   When I click the very stylish "Change section" button
+   Then I should see "Select new section for the document"
+   And I should see "Decisions" in "Modal window"
+   When I click "Decisions" in "Modal window"
+   Then I should see "You have successfully moved Howto to the Decisions section"
+   And I should see "Decisions" in "The Breadcrumb"

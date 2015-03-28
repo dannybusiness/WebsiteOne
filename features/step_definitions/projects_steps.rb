@@ -14,21 +14,18 @@ When(/^There are projects in the database$/) do
 end
 
 Given(/^the following projects exist:$/) do |table|
-  temp_author = nil
+  #TODO YA rewrite with factoryGirl
   table.hashes.each do |hash|
     if hash[:author].present?
       u = User.find_by_first_name hash[:author]
-      hash.except! 'author'
-      u.projects.create(hash)
+      project = Project.new(hash.except('author', 'tags').merge(user_id: u.id))
     else
-      if temp_author.nil?
-        temp_author = User.create first_name: 'First',
-                                  last_name: 'Last',
-                                  email: "dummy#{User.count}@users.co",
-                                  password: '1234124124'
-      end
-      temp_author.projects.create hash
+      project = default_test_author.projects.new(hash.except('author', 'tags'))
     end
+    if hash[:tags]
+      project.tag_list.add(hash[:tags], parse: true)
+    end
+    project.save!
   end
 end
 
@@ -37,6 +34,9 @@ Then /^I should see a form for "([^"]*)"$/ do |form_purpose|
     when 'creating a new project'
       page.should have_text form_purpose
       page.should have_css('form#new_project')
+
+    else
+      pending
   end
 end
 
@@ -49,10 +49,6 @@ When(/^I click the "([^"]*)" button for project "([^"]*)"$/) do |button, project
   else
     visit path_to(button, 'non-existent')
   end
-end
-
-When(/^I click "([^"]*)" in the list of projects$/) do |name|
-  find(:css, %Q{a[data-link-text="#{name.downcase}"]}).click()
 end
 
 Given(/^the document "([^"]*)" has a child document with title "([^"]*)"$/) do |parent, child|
@@ -74,16 +70,30 @@ end
 When(/^I am a member of project "([^"]*)"$/) do |name|
   step %Q{I should become a member of project "#{name}"}
 end
+
+When(/^"(.*)" is a member of project "([^"]*)"$/) do |name, project|
+  user = User.find_by_first_name(name)
+  object = Project.find_by_title(project)
+  user.follow(object)
+end
+
 Then(/^I should stop being a member of project "([^"]*)"$/) do |name|
   object = Project.find_by_title(name)
   @user.stop_following(object)
 end
+
 When(/^I am not a member of project "([^"]*)"$/) do |name|
   step %Q{I should stop being a member of project "#{name}"}
 end
 
+When(/^"(.*)" is not a member of project "([^"]*)"$/) do |name, project|
+  user = User.find_by_first_name(name)
+  object = Project.find_by_title(project)
+  user.stop_following(object)
+end
+
 Given(/^I am on the home page$/) do
-  visit "/"
+  visit root_path
 end
 
 Then(/^(.*) in the project members list$/) do |s|
@@ -102,6 +112,33 @@ Given(/^I (?:am on|go to) project "([^"]*)"$/) do |project|
   visit(path_to('projects', project.id ))
 end
 
+Given(/^the document "([^"]*)" has a sub-document with title "([^"]*)" created (\d+) days ago$/) do |parent, child, days_ago|
+  parent_doc = Document.find_by_title(parent)
+  parent_doc.children.create!(
+      {
+          :project_id => parent_doc.project_id,
+          :title => child,
+          :created_at => days_ago.to_i.days.ago,
+          user_id: parent_doc.user_id
+      }
+  )
+end
+
+# Bryan: Redundant, does nothing
+#And(/^the following sub-documents exist:$/) do |table|
+#  table.hashes
+#end
+
+Given(/^I (should not|should) see a link to "(.*?)" on github$/) do |option, name|
+  object = Project.find_by_title(name)
+  step %Q{I #{option} see link "#{object.github_url.split('/').last}"}
+end
+
+Given(/^I (should not|should) see a link to "(.*?)" on Pivotal Tracker$/) do |option, name|
+  object = Project.find_by_title(name)
+  step %Q{I #{option} see link "#{object.title}"}
+end
+
 Given(/^The project "([^"]*)" has (\d+) (.*)$/) do |title, num, item|
   project = Project.find_by_title(title)
   case item.downcase.pluralize
@@ -110,8 +147,23 @@ Given(/^The project "([^"]*)" has (\d+) (.*)$/) do |title, num, item|
         u = User.create(email: Faker::Internet.email, password: '1234567890')
         u.follow(project)
       end
-
     else
       pending
   end
+end
+
+Then(/^I should see (\d+) member avatars$/) do |count|
+  within ('#members-list') do
+    expect(page).to have_css '.user-preview', count: count
+  end
+
+end
+
+
+Given(/^I am allowed to edit pitch for project "([^"]*)"$/) do |project|
+  step %Q{
+    Given I am logged in
+    And I am on the "Show" page for project "#{project}"
+    And I click the "Join Project" button
+       }
 end

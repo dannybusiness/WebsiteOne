@@ -1,20 +1,22 @@
 require 'spec_helper'
 
-describe ProjectsController do
+describe ProjectsController, :type => :controller do
 
   let(:valid_attributes) { {:id => 1,
                             :title => 'WebTwentyFive',
                             :description => 'My project description',
                             :status => 'Active',
-                            :friendly_id => 'my-project' } }
+                            :pitch => 'My project pitch ...',
+                            :pivotaltracker_url => 'https://www.pivotaltracker.com/s/projects/982890',
+                            :slug => 'my-project' } }
   let(:valid_session) { {} }
 
   #TODO split specs into 'logged in' vs 'not logged in'
   before :each do
     # stubbing out devise methods to simulate authenticated user
-    @user = double('user', id: 1, friendly_id: 'some-id')
-    request.env['warden'].stub :authenticate! => @user
-    controller.stub :current_user => @user
+    @user = build_stubbed(User, id: 1, slug: 'some-id')
+    allow(request.env['warden']).to receive(:authenticate!).and_return(@user)
+    allow(controller).to receive(:current_user).and_return(@user)
   end
 
   let(:user) { @user }
@@ -26,8 +28,12 @@ describe ProjectsController do
   #  end
   #end
 
-
   describe '#index' do
+    before(:each) do
+      @project = mock_model(Project, title: 'Carrier has arrived.', commit_count: 100)
+      @project2 = mock_model(Project, title: 'Carrier has left.', commit_count: 200)
+    end
+
     it 'should render index page for projects' do
       get :index
       expect(response).to render_template 'index'
@@ -35,25 +41,39 @@ describe ProjectsController do
 
 
     it 'should assign variables to be rendered by view' do
-      Project.stub(:search).and_return('Carrier has arrived.')
+      allow(Project).to receive(:search).and_return(@project)
+      @project.stub(:includes).and_return(@project)
       get :index
-      expect(assigns(:projects)).to eq 'Carrier has arrived.'
+      expect(assigns(:projects).title).to eq 'Carrier has arrived.'
+    end
+
+    #TODO: Refactor! This test is wrong. I can not test the order of projects.
+    it 'orders project by commit_count' do
+      allow(Project).to receive(:search).and_return(@projects)
+      @projects.stub(:includes).and_return([@project2, @project])
+      get :index, {search: ''}, valid_session
+      expect(assigns(:projects)).to match_array [@project2, @project]
     end
   end
 
   describe '#show' do
     before(:each) do
-      @project = mock_model(Project, valid_attributes)
-      @project.stub(:tag_list).and_return [ 'WTF' ]
+      @project = build_stubbed(Project, valid_attributes)
+      allow(@project).to receive(:tag_list).and_return [ 'WSO' ]
       Project.stub_chain(:friendly, :find).and_return @project
-      @users = [ mock_model(User, friendly_id: 'my-friendly-id', display_profile: true) ]
-      @more_users = @users + [ mock_model(User, friendly_id: 'another-friendly-id', display_profile: false)]
-      @project.should_receive(:followers).and_return @more_users
+      @project.stub_chain(:user, :display_name).and_return "Happy User"
+      @users = [ build_stubbed(User, slug: 'my-friendly-id', display_profile: true) ]
+      expect(@project).to receive(:members).and_return @users
+      expect(YoutubeVideos).to receive(:for).with(@project).and_return('videos')
+      allow(PivotalService).to receive(:one_project).and_return('')
+      dummy = Object.new
+      dummy.stub(stories: "stories")
+      PivotalService.stub(iterations: dummy)
     end
 
     it 'assigns the requested project as @project' do
       get :show, {:id => @project.friendly_id}, valid_session
-      assigns(:project).should eq(@project)
+      expect(assigns(:project)).to eq(@project)
     end
 
     it 'renders the show template' do
@@ -63,36 +83,24 @@ describe ProjectsController do
 
     it 'assigns the list of members with public profiles to @members' do
       get :show, { id: @project.friendly_id }, valid_session
-      assigns(:members).should eq @users
+      expect(assigns(:members)).to eq @users
     end
 
     it 'assigns the list of related YouTube videos in alphabetical order' do
-      accepted_videos = [
-          { title: 'WebTwentyFive PP' },
-          { title: 'WTF PP'},
-          { title: 'PP on WebtwentyFive'},
-          { title: 'pp on wtf'},
-          { title: 'A PP on WTF'},
-          { title: 'My PP on WTF'},
-          { title: 'webtwentyfive PP on refactoring'}
-      ]
-      rejected_videos = [
-          { title: 'Cat Movie' },
-          { title: 'Dogs and Cats' },
-          { title: 'My Cats newborn' },
-          { title: 'Cat Attack' }
-      ]
-      videos = rejected_videos + accepted_videos
-      Youtube.should_receive(:user_videos).and_return videos
       get :show, { id: @project.friendly_id }, valid_session
-      assigns(:videos).should eq accepted_videos.sort_by! { |v| v[:published] }
+      expect(assigns(:videos)).to eq 'videos'
+    end
+
+    it 'assigns the list of related PivtalTracker stories' do
+      get :show, { id: @project.friendly_id }, valid_session
+      expect(assigns(:stories)).to eq 'stories'
     end
   end
 
   describe '#new' do
     it 'should render a new project page' do
       get :new
-      assigns(:project).should be_a_new(Project)
+      expect(assigns(:project)).to be_a_new(Project)
       expect(response).to render_template 'new'
     end
   end
@@ -108,44 +116,46 @@ describe ProjectsController do
           }
       }
       @project = mock_model(Project, friendly_id: 'some-project')
-      Project.stub(:new).and_return(@project)
-      controller.stub(:current_user).and_return(@user)
+      allow(Project).to receive(:new).and_return(@project)
+      allow(controller).to receive(:current_user).and_return(@user)
+      allow(@project).to receive(:create_activity)
+
     end
 
     it 'assigns a newly created project as @project' do
-      @project.stub(:save)
+      allow(@project).to receive(:save)
       post :create, @params
       expect(assigns(:project)).to eq @project
     end
 
     context 'successful save' do
-
-      it 'redirects to index' do
-        @project.stub(:save).and_return(true)
-
+      before(:each) do
+        allow(@project).to receive(:save).and_return(true)
         post :create, @params
-
-        expect(response).to redirect_to(projects_path)
       end
+      it 'redirects to index' do
+        expect(response).to redirect_to(project_path(@project))
+      end
+
+      it 'received :create_activity with :create' do
+        expect(@project).to have_received(:create_activity).with(:create, { owner: @user })
+      end
+
       it 'assigns successful message' do
-        @project.stub(:save).and_return(true)
-
-        post :create, @params
-
         #TODO YA add a show view_spec to check if flash is actually displayed
         expect(flash[:notice]).to eq('Project was successfully created.')
       end
 
       it 'passes current_user id into new' do
-        Project.should_receive(:new).with({"title" => "Title 1", "description" => "Description 1", "status" => "Status 1", "user_id" => @user.id})
-        @project.stub(:save).and_return(true)
+        expect(Project).to receive(:new).with({"title" => "Title 1", "description" => "Description 1", "status" => "Status 1", "user_id" => @user.id})
+        allow(@project).to receive(:save).and_return(true)
         post :create, @params
       end
     end
 
     context 'unsuccessful save' do
       it 'renders new template' do
-        @project.stub(:save).and_return(false)
+        allow(@project).to receive(:save).and_return(false)
 
         post :create, @params
 
@@ -153,7 +163,7 @@ describe ProjectsController do
       end
 
       it 'assigns failure message' do
-        @project.stub(:save).and_return(false)
+        allow(@project).to receive(:save).and_return(false)
 
         post :create, @params
 
@@ -164,7 +174,7 @@ describe ProjectsController do
 
   describe '#edit' do
     before(:each) do
-      @project = double(Project)
+      @project = Project.new
       Project.stub_chain(:friendly, :find).with(an_instance_of(String)).and_return(@project)
       get :edit, id: 'some-random-thing'
     end
@@ -218,24 +228,30 @@ describe ProjectsController do
 
   describe '#update' do
     before(:each) do
-      @project = mock_model(Project)
+      @project = FactoryGirl.create(:project)
+      allow(@project).to receive(:create_activity)
       Project.stub_chain(:friendly, :find).with(an_instance_of(String)).and_return(@project)
     end
 
     it 'assigns the requested project as @project' do
-      @project.should_receive(:update_attributes)
+      expect(@project).to receive(:update_attributes)
       put :update, id: 'update', project: {title: ''}
       expect(assigns(:project)).to eq(@project)
     end
 
     context 'successful update' do
       before(:each) do
-        @project.stub(:update_attributes).and_return(true)
+        allow(@project).to receive(:update_attributes).and_return(true)
         put :update, id: 'update', project: {title: ''}
       end
 
+      it 'received :create_activity with :update' do
+        expect(@project).to have_received(:create_activity)
+                            .with(:update, {owner: @user })
+      end
+
       it 'redirects to the project' do
-        expect(response).to redirect_to(projects_path)
+        expect(response).to redirect_to(project_path(@project))
       end
 
       it 'shows a success message' do
@@ -245,7 +261,7 @@ describe ProjectsController do
 
     context 'unsuccessful save' do
       before(:each) do
-        @project.stub(:update_attributes).and_return(false)
+        allow(@project).to receive(:update_attributes).and_return(false)
         put :update, id: 'update', project: {title: ''}
       end
       it 'renders edit' do
@@ -254,6 +270,39 @@ describe ProjectsController do
 
       it 'shows an unsuccessful message' do
         expect(flash[:alert]).to eq('Project was not updated.')
+      end
+    end
+
+    context 'pitch update with Mercury' do
+      @project = FactoryGirl.create(:project)
+      let(:params) do
+            {:id=>@project,
+             :content=>
+                 {:pitch_content=>{:value=>"my new pitch"},
+                  }}
+      end
+      let(:project) { @project }
+
+      before(:each) do
+        allow(@project).to receive(:update_attributes).and_return(true)
+        allow(project).to receive(:create_activity)
+        put :mercury_update, params
+
+      end
+
+      it 'should render an empty string' do
+        expect(response.body).to be_empty
+      end
+
+
+      it 'should update the project pitch with the content' do
+        expect(project).to have_received(:update_attributes)
+                            .with(pitch: 'my new pitch')
+      end
+
+      it 'received :create_activity with :update' do
+        expect(project).to have_received(:create_activity)
+                            .with(:update, owner: @user)
       end
     end
   end

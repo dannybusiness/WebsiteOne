@@ -1,23 +1,36 @@
 require 'spec_helper'
 
-describe "users/show.html.erb" do
-	before :each do
+describe 'users/show.html.erb' do
+  before :each do
     now = DateTime.now
-    thirty_days_ago = (now - 30)
+    thirty_days_ago = (now - 33)
     @projects = [
         mock_model(Project, friendly_id: 'title-1', title: 'Title 1'),
         mock_model(Project, friendly_id: 'title-2', title: 'Title 2'),
         mock_model(Project, friendly_id: 'title-3', title: 'Title 3')
     ]
-	  @user = mock_model(User, id: 4,
-                             display_name: 'Eric Els',
-                             first_name: 'Eric',
-                             last_name: 'Els',
-                             email: 'eric@somemail.se',
-                             created_at: thirty_days_ago
-                      )
-		assign :user, @user
-    assign :users_projects, @projects
+    @user = FactoryGirl.create(:user,
+                              first_name: 'Eric',
+                              last_name: 'Els',
+                              email: 'eric@somemail.se',
+                              title_list: 'Philanthropist',
+                              created_at: thirty_days_ago,
+                              github_profile_url: 'http://github.com/Eric',
+                              skill_list: %w(Shooting Hooting),
+                              bio: 'Lonesome Cowboy')
+
+    @user.status.build(attributes = FactoryGirl.attributes_for(:status))
+
+    @commit_counts = [build_stubbed(:commit_count, project: @projects.first, user: @user, commit_count: 253)]
+
+    allow(@user).to receive(:following_projects).and_return(@projects)
+    allow(@user).to receive(:following_projects_count).and_return(2)
+    allow(@user).to receive(:commit_counts).and_return(@commit_counts)
+    allow(@user).to receive(:following?).and_return(true)
+    allow(@user).to receive(:status?).and_return(true)
+    allow(@commit_counts.first.project).to receive(:contribution_url).and_return('test_url')
+
+    assign :user, @user
     @youtube_videos = [
         {
             url: "http://www.youtube.com/100",
@@ -36,7 +49,83 @@ describe "users/show.html.erb" do
         }
     ]
     assign :youtube_videos, @youtube_videos
-	end
+    @skills = %w(rails ruby rspec)
+    assign :skills, @skills
+  end
+
+  describe 'user information tabs' do
+    it 'renders a tab view' do
+      render
+      expect(rendered).to have_css('ul#tabs')
+    end
+
+    context 'user with profile attributes' do
+      it 'render default bio if User has provided one' do
+        allow(@user).to receive(:bio?).and_return true
+        render
+        rendered.within('section.user-bio') do |section|
+          expect(section).to have_text 'Lonesome Cowboy'
+        end
+      end
+
+      it 'render tab Skills if user has :skill_list' do
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to have_link 'Skills', href: '#user-skills'
+        end
+      end
+
+      it 'render tab Projects if user has :following_projects_count' do
+        allow(@user).to receive(:following_projects_count).and_return 1
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to have_link 'Projects', href: '#projects'
+        end
+      end
+
+      it 'render tab Activity if user has :commit_count' do
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to have_link 'Activity', href: '#activity'
+        end
+      end
+    end
+
+    context 'user with empty attributes' do
+
+      it 'render default bio if User has not provided one' do
+        allow(@user).to receive(:bio?).and_return false
+        render
+        rendered.within('section.user-bio') do |section|
+          expect(section).to have_text 'This member has not written his bio yet...'
+        end
+      end
+
+      it 'do not render tab Skills if user has no :skill_list' do
+        allow(@user).to receive(:skill_list).and_return([])
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to_not have_link 'Skills', href: '#user-skills'
+        end
+      end
+
+      it 'do not render tab Projects if user has no :following_projects_count' do
+        allow(@user).to receive(:following_projects_count).and_return 0
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to_not have_link 'Projects', href: '#projects'
+        end
+      end
+
+      it 'do not render tab Activity if user has no :commit_count' do
+        allow(@user).to receive(:commit_counts).and_return []
+        render
+        rendered.within('ul#tabs') do |section|
+          expect(section).to_not have_link 'Activity', href: '#activity'
+        end
+      end
+    end
+  end
 
   it 'renders a table wih video links if there are videos' do
     render
@@ -54,53 +143,61 @@ describe "users/show.html.erb" do
       expect(rendered).to have_text(video[:published])
     end
   end
+
   it 'renders "no available videos" if user has no videos' do
     assign(:youtube_videos, nil)
     render
     expect(rendered).to have_text('Eric Els has no publicly viewable Youtube videos.')
   end
 
-  it 'renders "connect youtube channel" when user views his profile and it is not yet connected' do
-    @user.stub(youtube_id: nil)
-    assign(:youtube_videos, nil)
-    view.stub(current_user: @user)
-
+  it 'should render the users gravatar image' do
     render
-    expect(rendered).to have_link('Sync with YouTube')
+    expect(rendered).to have_css('img[src*=gravatar]')
   end
 
-  it 'renders "disconnect youtube channel" when user views his profile and is connected' do
-    @user.stub(youtube_id: 'test')
-    assign(:youtube_videos, nil)
-    view.stub(current_user: @user)
-
-    render
-    expect(rendered).to have_link('Disconnect YouTube')
-  end
-
-  it 'does not render "connect youtube channel" when user views other profile' do
-    @user.stub(youtube_id: nil)
-    assign(:youtube_videos, nil)
-    view.stub(current_user: mock_model(User, id: 'test'))
-
-    render
-    expect(rendered).not_to have_text('Link your YouTube channel')
-  end
-
-  it 'renders big user avatar' do
-    expect(view).to receive(:gravatar_for).with(@user.email ,size: 275).and_return('img_link')
-    render
-    expect(rendered).to have_css('img')
-    expect(rendered).to have_xpath("//img[contains(@src, 'img_link')]")
-  end
   it 'renders user first and last names' do
-  	render
-  	expect(rendered).to have_content(@user.first_name)
-  	expect(rendered).to have_content(@user.last_name)
+    render
+    expect(rendered).to have_content(@user.first_name)
+    expect(rendered).to have_content(@user.last_name)
   end
 
-  it 'show link to GitHub profile' do
-  	pending("requires github API integration")
+  it 'renders user status' do
+    render
+    expect(rendered).to have_content(@user.status.last[:status])
+  end
+
+  it 'prompts user to update their status' do
+    render
+    expect(rendered).to have_selector('input', type: 'submit', value: 'Update status')
+  end
+
+  describe 'geolocation' do
+    it 'does not show globe icon when no country is set' do
+      render
+      expect(rendered).not_to have_selector 'i[class="fa fa-globe fa-lg"]'
+    end
+
+    it 'shows user country when known' do
+      @user.country_name = 'Mozambique'
+      render
+      expect(rendered).to have_selector 'i[class="fa fa-globe fa-lg"]'
+      expect(rendered).to have_content @user.country_name
+    end
+
+    it 'does not show clock icon when user timezone cannot be determined' do
+      render
+      expect(rendered).not_to have_selector 'i[class="fa fa-clock-o fa-lg"]'
+    end
+
+    it 'shows user timezone when it can be determined' do
+      @user.latitude = 25.9500
+      @user.longitude = 32.5833
+      allow(@user.presenter).to receive(:timezone_formatted_offset).and_return('+02:00')
+      expect(NearestTimeZone).to receive(:to).with(@user.latitude, @user.longitude).and_return('Africa/Cairo')
+      render
+      expect(rendered).to have_selector 'i[class="fa fa-clock-o fa-lg"]'
+      expect(rendered).to have_content 'Africa/Cairo (UTC+02:00)'
+    end
   end
 
   it 'should not display an edit button if it is not my profile' do
@@ -111,23 +208,69 @@ describe "users/show.html.erb" do
     expect(rendered).not_to have_link('Edit', href: '/users/edit')
   end
 
+  context 'profile privacy' do
+
+    it 'should display email if it is set to public' do
+      @user.display_email = true
+      render
+      expect(rendered).to have_link(@user.email)
+    end
+
+    it 'should display an hire me button if it set to public' do
+      @user.display_hire_me = true
+      render
+      expect(rendered).to have_link('Hire me', href: user_path(@user))
+    end
+
+    it 'should not display email if it is set to private' do
+      @user.display_email = false
+      render
+      expect(rendered).to_not have_link(@user.email)
+    end
+
+    it 'should display an hire me button if it set to private' do
+      @user.display_hire_me = false
+      render
+      expect(rendered).not_to have_link('Hire me', href: user_path(@user))
+    end
+  end
+
   it 'should display Member for ..' do
-    #Date.stub(today:'07/02/2014'.to_date )
     render
-    expect(rendered).to have_text('Member for: about 1 month')
+    expect(rendered).to have_text('Member for about 1 month')
+  end
+
+  it 'should render the users bio' do
+    render
+    expect(rendered).to have_text('Lonesome Cowboy')
+  end
+
+  it 'should render the users title' do
+    render
+    expect(rendered).to have_text('Philanthropist')
+  end
+
+  it 'displays GitHub profile if it is linked' do
+    render
+    expect(rendered).to have_link('Eric', href: 'http://github.com/Eric')
   end
 
   context 'users own profile page' do
-    before :each do
+    before(:each) do
         @user_logged_in ||= FactoryGirl.create :user
         sign_in @user_logged_in # method from devise:TestHelpers
     end
+
     it 'displays an edit button if it is my profile' do
       render
       expect(rendered).to_not have_xpath("//a[contains(@type, 'button')]")
     end
+  end
 
-
+  it 'renders a list of contributions made by user' do
+    render
+    expect(rendered).to have_text('Title 1 - 253')
+    expect(rendered).to have_link('Title', href: 'test_url')
   end
 
   it 'renders list of followed projects' do
@@ -137,5 +280,10 @@ describe "users/show.html.erb" do
     end
   end
 
-  it 'renders user statistics'
+  it 'renders list of user skills' do
+    render
+    @user.skill_list.each do |skill|
+      expect(rendered).to have_text(skill)
+    end
+  end
 end

@@ -1,58 +1,66 @@
-/*!
-
- *= require_self
- *= require font-awesome
- *= require_tree
- */
-
 @import "bootstrap";
+@import "font-awesome";
+@import "variables";
+@import "mixins";
 
-.signin {
-  h2 { margin-top: 0; }
-  form { margin-bottom: 20px; }
-  .glyphicon { top: 0; }
+@import "main";
+@import "timeline";
+@import "global/*";
+@import "layout/*";
+
+.custom_menu {
+  width: 200px !important;
+  background-color: #34495e !important;
 }
 
+.custom_menu_item {
+  margin-left: 10px;
+  margin-top: 10px;
+  color: white !important;
+}
 
-#devise .custom-label {
-  margin-left: 5px;
-  margin-top: 3px;
+.custom_menu_link {
+  color: white !important;
+}
+
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  padding-top: 30px; height: 0; overflow: hidden;
+}
+
+.video-container iframe,
+.video-container object,
+.video-container embed {
   position: absolute;
-  color: black;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-.alert {
-  margin-top: 5px;
+.user-status {
+	margin-left: 10px; 
+	margin-top: -5px; 
+	color: #54555a;
 }
 
-label {
-  color: black;
+/* enable absolute positioning */
+.inner-addon {
+  position: relative;
 }
 
-.bg-3 {
-  background: url('bg1-db4d48709782e1e17ea9b9f2c41da4a1.jpg') no-repeat center center fixed;
-  /*background: #f16251; */
-  -webkit-background-size: cover;
-  -moz-background-size: cover;
-  -o-background-size: cover;
-  background-size: cover;
+/* style icon */
+.inner-addon .fa {
+  position: absolute;
+  padding: 10px;
+  pointer-events: none;
 }
 
-.bg-1 {
-  background: url('http://www.ilikewallpaper.net/ipad-air-wallpapers/download/8253/Dark-Pattern-ipad-4-wallpaper-ilikewallpaper_com_1024.jpg') no-repeat center center fixed;
-  /*background: #f16251;*/
-  -webkit-background-size: cover;
-  -moz-background-size: cover;
-  -o-background-size: cover;
-  background-size: cover;
-}
+/* align icon */
+.left-addon .fa { left:  0px; }
+.right-addon .fa { right: 0px; }
 
-.bg-2 {
-  background: url(http://mymaplist.com/img/parallax/back.png);
-  background-color: #444;
-  background: url(http://mymaplist.com/img/parallax/pinlayer2.png),url(http://mymaplist.com/img/parallax/pinlayer1.png),url(http://mymaplist.com/img/parallax/back.png);
-  padding-top:100px;
-  /*background: #ffcc33; */
-
-}
-
+/* add padding  */
+.left-addon input  { padding-left:  30px; }
+.right-addon input { padding-right: 30px; }

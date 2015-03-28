@@ -3,21 +3,38 @@
 # newer version of cucumber-rails. Consider adding your own code to a new file
 # instead of editing this one. Cucumber will automatically load all features/**/*.rb
 # files.
+require 'coveralls'
+Coveralls.wear_merged! 'rails'
+
+ENV['CUCUMBER'] = 'cucumber'
 
 require 'cucumber/rails'
 require 'cucumber/rspec/doubles'
-
+require 'capybara/poltergeist'
+require 'capybara-screenshot/cucumber'
+require 'geocoder/lookups/base'
+require 'geocoder/results/freegeoip'
 require 'webmock/cucumber'
+require 'delorean'
+
 WebMock.disable_net_connect!(:allow_localhost => true)
+
+OmniAuth.config.logger.level = Logger::WARN
 
 # Capybara defaults to CSS3 selectors rather than XPath.
 # If you'd prefer to use XPath, just uncomment this line and adjust any
 # selectors in your step definitions to use the XPath syntax.
 # Capybara.default_selector = :xpath
 
-Capybara.javascript_driver = :webkit
+Capybara.javascript_driver = :poltergeist
+Capybara.default_wait_time = 5
+
+Capybara.register_driver :poltergeist_debug do |app|
+  Capybara::Poltergeist::Driver.new(app, :inspector => true, :port => 3010)
+end
 
 # By default, any exception happening in your Rails application will bubble up
+#
 # to Cucumber so that your scenario will fail. This is a different from how 
 # your application behaves in the production environment, where an error page will 
 # be rendered instead.
@@ -36,11 +53,13 @@ ActionController::Base.allow_rescue = false
 
 # Remove/comment out the lines below if your app doesn't have a database.
 # For some databases (like MongoDB and CouchDB) you may need to use :truncation instead.
-begin
-  DatabaseCleaner.strategy = :transaction
-rescue NameError
-  raise "You need to add database_cleaner to your Gemfile (in the :test group) if you wish to use it."
-end
+
+# Bryan: This was not doing anything
+#begin
+#  DatabaseCleaner.strategy = :transaction
+#rescue NameError
+#  raise "You need to add database_cleaner to your Gemfile (in the :test group) if you wish to use it."
+#end
 
 # You may also want to configure DatabaseCleaner to use different strategies for certain features and scenarios.
 # See the DatabaseCleaner documentation for details. Example:
@@ -62,3 +81,25 @@ end
 # See https://github.com/cucumber/cucumber-rails/blob/master/features/choose_javascript_database_strategy.feature
 Cucumber::Rails::Database.javascript_strategy = :truncation
 
+Geocoder.configure(:ip_lookup => :test)
+Geocoder::Lookup::Test.add_stub(
+    '127.0.0.1', [
+                   {
+                       ip: '127.0.0.1',
+                       country_code: 'SE',
+                       country_name: 'Sweden',
+                       region_code: '28',
+                       region_name: 'Västra Götaland',
+                       city: 'Alingsås',
+                       zipcode: '44139',
+                       latitude: 57.9333,
+                       longitude: 12.5167,
+                       metro_code: '',
+                       areacode: ''
+                   }.as_json
+               ]
+)
+
+Before do
+  Settings.reload!
+end
