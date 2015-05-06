@@ -10,6 +10,8 @@ def path_to(page_name, id = '')
       root_path
     when 'registration' then
       new_user_registration_path
+    when 'edit registration' then
+      edit_user_registration_path
     when 'sign in' then
       new_user_session_path
     when 'projects' then
@@ -39,7 +41,7 @@ def path_to(page_name, id = '')
     when 'hookups' then
       hookups_path
     when 'dashboard' then
-      '/dashboard' 
+      '/dashboard'
     when 'new newsletter' then
       new_newsletter_path
     when 'newsletters index' then
